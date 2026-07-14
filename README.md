@@ -9,7 +9,7 @@
 - 个人主页：https://leetgpu.com/KYZ
 
 ---
-## 优化手段小结（Todo）
+## NCU分析调优，以及优化手段小结（Todo）
 
 
 
