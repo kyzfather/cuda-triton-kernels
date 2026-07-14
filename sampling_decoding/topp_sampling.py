@@ -1,29 +1,7 @@
 import torch
-import triton
-import triton.language as tl
 
-# 一维的，词表大小<=50,000
-# 单个block处理不了5w的数据，那么求max
-# softmax是单个block做吗？还是并行的split-k，开block并行，最后单block规约？
-# 求出softmax后，也没法单个block求最大值，难道只能用sort？
-# 但是单个block也没法sort
-@triton.jit
-def top_p_sampling_kernel(
-    logits_ptr,
-    p_ptr, seed_ptr, sampled_token_ptr,
-    vocab_size
-):
-
-
-@triton.jit
-def kernel0(
-    logits_ptr,
-    vocab_size,
-    BLOCK_SIZE: tl.constexpr,
-):
-    pid = tl.program_id(0)
-    logits_ptrs = logits_ptr + pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE) 
-
+## triton要实现的太多了，online softmax, sort, prefix sum scan
+## 这题应该是用torch写的
 
 def solve(
     logits: torch.Tensor,
@@ -32,4 +10,26 @@ def solve(
     sampled_token: torch.Tensor,
     vocab_size: int,
 ):
-    pass
+    probs = torch.softmax(logits[:vocab_size], dim=0)
+    sorted_probs, sorted_indices = torch.sort(probs, descending=True)
+
+    cdf = torch.cumsum(sorted_probs, dim=0)
+
+    cutoff = torch.searchsorted(cdf, p)
+    cutoff = torch.clamp(cutoff, max=vocab_size - 1)
+
+    nucleus_probs = sorted_probs[: cutoff+1]
+    nucleus_indices = sorted_indices[: cutoff+1]
+
+    nucleus_probs = nucleus_probs / nucleus_probs.sum()
+
+    g = torch.Generator(device=logits.device)
+    g.manual_seed(int(seed.item()))
+
+    idx = torch.multinomial(
+        nucleus_probs,
+        1,
+        generator=g,
+    ).item()
+
+    sampled_token[0] = nucleus_indices[idx]

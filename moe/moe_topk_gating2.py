@@ -31,7 +31,7 @@ def moe_topk_gating_kernel(
         tl.where(logits_data == max_val, -float("inf"), logits_data)
 
         weight_ptrs = topk_weights_ptr + tid * topk_weights_stride0 + i * topk_weights_stride1
-        indices_ptrs = topk_indices_ptr + tid * topk_indices_stride0 + i * topk_indices_stride1
+        indices_ptrs = topk_indices_ptr + tid * topk_indices_stride0    + i * topk_indices_stride1
         tl.store(weight_ptrs, max_val)
         tl.store(indices_ptrs, idx)
 
