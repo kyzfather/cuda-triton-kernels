@@ -80,7 +80,7 @@ def gemm(
 
     output_ptrs = output + (m_offsets * N)[:, None] + n_offsets[None, :]
     output_mask = (m_offsets < M)[:, None] & (n_offsets < N)[None, :]
-    tl.store(output_ptrs, acc, mask=output_mask)
+    tl.store(output_ptrs, acc.to(tl.float16), mask=output_mask)
 
 
 @triton.jit
@@ -98,7 +98,8 @@ def swiglu_activation_kernel(
     input_gate_data = tl.load(input_gate_ptrs, mask=mask, other=0.0).to(tl.float32)
     input_up_data = tl.load(input_up_ptrs, mask=mask, other=0.0).to(tl.float32)
     
-    res = input_gate_data * tl.sigmoid(input_gate_data) * input_up_data
+    res = input_gate_data * tl.sigmoid(input_gate_data) * input_up_data 
+    res = res.to(tl.float16)
     output_ptrs = output + row_id * d_ffn + col_id * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     tl.store(output_ptrs, res, mask=mask)
 
@@ -195,7 +196,7 @@ def benchmark(name, func, x, W_gate, W_up, W_down, out,
 
 
 # 时间分析：python swiglu.py
-# ncu分析：ncu --set full --profile-from-start off -o report_solve0 python swiglu.py --mode solve0 --ncu
+# ncu分析：ncu --set full --profile-from-start off -o report_solve1 python swiglu.py --mode solve1 --ncu
 if __name__ == "__main__":
     import argparse
     import time
@@ -209,7 +210,7 @@ if __name__ == "__main__":
     # 1. 设置维度与设备
     M, d_model, d_ffn = 512, 4096, 14336
     device = "cuda"
-    dtype = torch.float32
+    dtype = torch.float16
     
     torch.manual_seed(0)
     x = torch.randn(M, d_model, device=device, dtype=dtype)

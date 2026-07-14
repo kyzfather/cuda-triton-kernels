@@ -45,7 +45,7 @@ def attention_v2(q, k, v, o, M, N, K, qk_scale,
         d_old = d_new
     acc = acc / d_old[:, None]    
     o_ptrs = o + pid * BLOCK_M * K + (tl.arange(0, BLOCK_M) * K)[:, None] + offsets_k[None, :]
-    tl.store(o_ptrs, acc, mask=(q_row_mask[:, None] & col_mask[None, :]))
+    tl.store(o_ptrs, acc.to(tl.float16), mask=(q_row_mask[:, None] & col_mask[None, :]))
 
 
 # 带mask的版本（还不是变长的版本）
@@ -107,3 +107,17 @@ def solve(q: torch.tensor, k: torch.tensor, v: torch.tensor,
     grid = (triton.cdiv(M, BLOCK_M), )
     qk_scale = K ** -0.5
     attention_v2[grid](q, k, v, o, M, N, K, qk_scale, BLOCK_M, BLOCK_N, BLOCK_K, BLOCK_SIZE)
+
+if __name__ == "__main__":
+    M, N, K = 4096, 4096, 1288
+ 
+    device = "cuda"
+    dtype = torch.float16
+ 
+    q = torch.randn(M, K, device=device, dtype=dtype)
+    k = torch.randn(N, K, device=device, dtype=dtype)
+    v = torch.randn(N, K, device=device, dtype=dtype)
+    o = torch.empty(M, K, device=device, dtype=dtype)
+ 
+    solve(q, k, v, o, M, N, K)
+    torch.cuda.synchronize()    

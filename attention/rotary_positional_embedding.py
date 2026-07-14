@@ -60,4 +60,4 @@ def solve(
         output.stride(0), output.stride(1),
         BLOCK_SIZE=BLOCK_SIZE
     )
-    return output
+    return output   
